@@ -29,7 +29,10 @@ class Experiment:
         np.random.seed(seed)
         random.seed(seed)
         dgl.seed(seed)
-        dgl.random.seed(seed)
+        try:
+            dgl.random.seed(seed)
+        except AttributeError:
+            pass  # dgl.random.seed removed in DGL >= 2.x
 
 
     def loss_cls(self, model, mask, features, labels):
