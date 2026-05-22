@@ -1,6 +1,23 @@
 import argparse
 import copy
 from datetime import datetime
+import sys
+import types
+
+# torchdata.datapipes was removed in torchdata>=0.8 but DGL 2.x still imports it.
+# Inject a minimal stub so DGL loads cleanly on modern environments.
+def _patch_torchdata():
+    _td = types.ModuleType('torchdata')
+    _dp = types.ModuleType('torchdata.datapipes')
+    _di = types.ModuleType('torchdata.datapipes.iter')
+    class IterDataPipe: pass
+    _di.IterDataPipe = IterDataPipe
+    _dp.iter = _di
+    _td.datapipes = _dp
+    for _n, _m in [('torchdata', _td), ('torchdata.datapipes', _dp), ('torchdata.datapipes.iter', _di)]:
+        sys.modules.setdefault(_n, _m)
+
+_patch_torchdata()
 
 import numpy as np
 import torch
