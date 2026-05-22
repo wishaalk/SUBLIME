@@ -4,18 +4,25 @@ from datetime import datetime
 import sys
 import types
 
-# torchdata.datapipes was removed in torchdata>=0.8 but DGL 2.x still imports it.
-# Inject a minimal stub so DGL loads cleanly on modern environments.
+# torchdata.datapipes/dataloader2 were removed in torchdata>=0.8 but DGL 2.x still imports them.
+# Inject a dynamic proxy stub that satisfies any attribute access so DGL loads cleanly.
 def _patch_torchdata():
-    _td = types.ModuleType('torchdata')
-    _dp = types.ModuleType('torchdata.datapipes')
-    _di = types.ModuleType('torchdata.datapipes.iter')
-    class IterDataPipe: pass
-    _di.IterDataPipe = IterDataPipe
-    _dp.iter = _di
-    _td.datapipes = _dp
-    for _n, _m in [('torchdata', _td), ('torchdata.datapipes', _dp), ('torchdata.datapipes.iter', _di)]:
-        sys.modules.setdefault(_n, _m)
+    class _Stub(types.ModuleType):
+        def __getattr__(self, name):
+            cls = type(name, (), {
+                '__init__': lambda self, *a, **kw: None,
+                '__call__': lambda self, *a, **kw: (a[0] if len(a) == 1 else None),
+                '__iter__': lambda self: iter([]),
+            })
+            setattr(self, name, cls)
+            return cls
+
+    for _name in [
+        'torchdata', 'torchdata.datapipes', 'torchdata.datapipes.iter',
+        'torchdata.datapipes.map', 'torchdata.dataloader2',
+        'torchdata.dataloader2.graph', 'torchdata.dataloader2.dataloader2',
+    ]:
+        sys.modules.setdefault(_name, _Stub(_name))
 
 _patch_torchdata()
 
