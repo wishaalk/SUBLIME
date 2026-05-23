@@ -4,6 +4,12 @@ from datetime import datetime
 import sys
 import types
 
+# DGL 2.x pulls torchdata in via dgl.dataloading -> dgl.distributed -> dgl.graphbolt.
+# SUBLIME only uses dgl.graph(), dgl.function, and dgl.seed() — none of those modules.
+# Pre-register them as empty stubs so the file-based imports never run.
+for _n in ['dgl.dataloading', 'dgl.distributed', 'dgl.graphbolt']:
+    sys.modules[_n] = types.ModuleType(_n)
+
 import numpy as np
 import torch
 import torch.nn.functional as F
