@@ -4,28 +4,6 @@ from datetime import datetime
 import sys
 import types
 
-# torchdata.datapipes/dataloader2 were removed in torchdata>=0.8 but DGL 2.x still imports them.
-# Inject a dynamic proxy stub that satisfies any attribute access so DGL loads cleanly.
-def _patch_torchdata():
-    class _Stub(types.ModuleType):
-        def __getattr__(self, name):
-            cls = type(name, (), {
-                '__init__': lambda self, *a, **kw: None,
-                '__call__': lambda self, *a, **kw: (a[0] if len(a) == 1 else None),
-                '__iter__': lambda self: iter([]),
-            })
-            setattr(self, name, cls)
-            return cls
-
-    for _name in [
-        'torchdata', 'torchdata.datapipes', 'torchdata.datapipes.iter',
-        'torchdata.datapipes.map', 'torchdata.dataloader2',
-        'torchdata.dataloader2.graph', 'torchdata.dataloader2.dataloader2',
-    ]:
-        sys.modules.setdefault(_name, _Stub(_name))
-
-_patch_torchdata()
-
 import numpy as np
 import torch
 import torch.nn.functional as F
