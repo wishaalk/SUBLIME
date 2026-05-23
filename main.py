@@ -37,7 +37,9 @@ import torch.nn.functional as F
 # PyTorch >= 2.0 uses TF32 matmul by default on Ampere+ GPUs and a different
 # Adam implementation (foreach). Force highest precision and legacy Adam behavior
 # to match the original PyTorch 1.7 training dynamics.
-torch.set_float32_matmul_precision('highest')
+# set_float32_matmul_precision added in PyTorch 1.11; no-op on 1.7.
+if hasattr(torch, 'set_float32_matmul_precision'):
+    torch.set_float32_matmul_precision('highest')
 
 # foreach param was added in PyTorch 1.10; guard so the same main.py works
 # with PyTorch 1.7 (the paper's environment) and PyTorch 2.x.
