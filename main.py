@@ -34,6 +34,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+# PyTorch >= 2.0 uses TF32 matmul by default on Ampere+ GPUs and a different
+# Adam implementation (foreach). Force highest precision and legacy Adam behavior
+# to match the original PyTorch 1.7 training dynamics.
+torch.set_float32_matmul_precision('highest')
+
 from data_loader import load_data
 from model import GCN, GCL
 from graph_learners import *
@@ -115,7 +120,7 @@ class Experiment:
 
         model = GCN(in_channels=nfeats, hidden_channels=args.hidden_dim_cls, out_channels=nclasses, num_layers=args.nlayers_cls,
                     dropout=args.dropout_cls, dropout_adj=args.dropedge_cls, Adj=Adj, sparse=args.sparse)
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr_cls, weight_decay=args.w_decay_cls)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr_cls, weight_decay=args.w_decay_cls, foreach=False)
 
         bad_counter = 0
         best_val = 0
@@ -208,8 +213,10 @@ class Experiment:
                          emb_dim=args.rep_dim, proj_dim=args.proj_dim,
                          dropout=args.dropout, dropout_adj=args.dropedge_rate, sparse=args.sparse)
 
-            optimizer_cl = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.w_decay)
-            optimizer_learner = torch.optim.Adam(graph_learner.parameters(), lr=args.lr, weight_decay=args.w_decay)
+            # foreach=False matches PyTorch 1.7 loop-based Adam (paper's environment).
+            # PyTorch 2.x defaults foreach=True which uses different CUDA kernels.
+            optimizer_cl = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.w_decay, foreach=False)
+            optimizer_learner = torch.optim.Adam(graph_learner.parameters(), lr=args.lr, weight_decay=args.w_decay, foreach=False)
 
 
             if torch.cuda.is_available():
