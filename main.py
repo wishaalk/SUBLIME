@@ -3,62 +3,22 @@ import copy
 from datetime import datetime
 import os
 import sys
+import types
 
 
-def _setup_torchdata_stub(base='/tmp/_td_stub'):
-    """Write real stub .py files for torchdata so DGL 2.x imports cleanly.
+# DGL 2.x's dgl.graphbolt imports torchdata which was removed in torchdata>=0.8.
+# Surgically block only dgl.graphbolt by pre-registering it in sys.modules
+# BEFORE importing dgl. Python will use this stub without ever executing
+# dgl/graphbolt/__init__.py. dgl.dataloading and dgl.distributed are left
+# completely untouched so DGL's own circular import resolution works normally.
+# SUBLIME only uses dgl.graph(), dgl.function, dgl.seed() — not graphbolt.
+class _DGLGraphboltStub(types.ModuleType):
+    def __getattr__(self, name):
+        cls = type(name, (), {})
+        setattr(self, name, cls)
+        return cls
 
-    DGL 2.x requires torchdata.datapipes / dataloader2 which were removed in
-    torchdata>=0.8.  sys.modules tricks are unreliable for 'from X import Y';
-    real package files are the only approach that works across all Python
-    import machinery.
-    """
-    os.makedirs(f'{base}/torchdata/datapipes', exist_ok=True)
-    os.makedirs(f'{base}/torchdata/dataloader2', exist_ok=True)
-
-    # IterDataPipe inherits from torch.utils.data.IterDataPipe when available
-    # so that DGL's functional_datapipe decorator issubclass() check passes.
-    _iter_src = (
-        "try:\n"
-        "    import torch.utils.data as _t\n"
-        "    _B = _t.IterDataPipe\n"
-        "except Exception:\n"
-        "    _B = object\n"
-        "class IterDataPipe(_B): pass\n"
-        "class Mapper(IterDataPipe): pass\n"
-        "class Filter(IterDataPipe): pass\n"
-        "class Shuffler(IterDataPipe): pass\n"
-        "class Collator(IterDataPipe): pass\n"
-    )
-    _graph_src = (
-        "def traverse_dps(dp, *a, **kw): return {}\n"
-        "def list_dps(*a, **kw): return []\n"
-        "def find_dps(*a, **kw): return []\n"
-        "def replace_dp(graph, old, new): return old\n"
-        "class DataPipeGraph: pass\n"
-        "class DataPipeNode: pass\n"
-    )
-    files = {
-        f'{base}/torchdata/__init__.py': '',
-        f'{base}/torchdata/datapipes/__init__.py': '',
-        f'{base}/torchdata/datapipes/iter.py': _iter_src,
-        f'{base}/torchdata/datapipes/map.py': 'class MapDataPipe: pass\n',
-        f'{base}/torchdata/dataloader2/__init__.py': '',
-        f'{base}/torchdata/dataloader2/graph.py': _graph_src,
-    }
-    for path, src in files.items():
-        with open(path, 'w') as fh:
-            fh.write(src)
-
-    # Clear any previously-imported (broken) torchdata, then put stub first.
-    for k in list(sys.modules):
-        if k == 'torchdata' or k.startswith('torchdata.'):
-            del sys.modules[k]
-    if base not in sys.path:
-        sys.path.insert(0, base)
-
-
-_setup_torchdata_stub()
+sys.modules['dgl.graphbolt'] = _DGLGraphboltStub('dgl.graphbolt')
 
 import numpy as np
 import torch
