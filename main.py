@@ -14,11 +14,21 @@ import types
 # SUBLIME only uses dgl.graph(), dgl.function, dgl.seed() — not graphbolt.
 class _DGLGraphboltStub(types.ModuleType):
     def __getattr__(self, name):
+        # Let Python handle dunder lookups normally (returning AttributeError
+        # for missing ones). If we returned a class for __file__ etc., Python's
+        # inspect module would crash trying to call .endswith() on a class object.
+        if name.startswith('__') and name.endswith('__'):
+            raise AttributeError(name)
         cls = type(name, (), {})
         setattr(self, name, cls)
         return cls
 
-sys.modules['dgl.graphbolt'] = _DGLGraphboltStub('dgl.graphbolt')
+_gb_stub = _DGLGraphboltStub('dgl.graphbolt')
+_gb_stub.__file__ = '<dgl-graphbolt-stub>'
+_gb_stub.__path__ = []
+_gb_stub.__package__ = 'dgl.graphbolt'
+_gb_stub.__spec__ = None
+sys.modules['dgl.graphbolt'] = _gb_stub
 
 import numpy as np
 import torch
