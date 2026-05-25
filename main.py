@@ -1,50 +1,10 @@
 import argparse
 import copy
 from datetime import datetime
-import os
-import sys
-import types
-
-
-# DGL 2.x's dgl.graphbolt imports torchdata which was removed in torchdata>=0.8.
-# Surgically block only dgl.graphbolt by pre-registering it in sys.modules
-# BEFORE importing dgl. Python will use this stub without ever executing
-# dgl/graphbolt/__init__.py. dgl.dataloading and dgl.distributed are left
-# completely untouched so DGL's own circular import resolution works normally.
-# SUBLIME only uses dgl.graph(), dgl.function, dgl.seed() — not graphbolt.
-class _DGLGraphboltStub(types.ModuleType):
-    def __getattr__(self, name):
-        # Let Python handle dunder lookups normally (returning AttributeError
-        # for missing ones). If we returned a class for __file__ etc., Python's
-        # inspect module would crash trying to call .endswith() on a class object.
-        if name.startswith('__') and name.endswith('__'):
-            raise AttributeError(name)
-        cls = type(name, (), {})
-        setattr(self, name, cls)
-        return cls
-
-_gb_stub = _DGLGraphboltStub('dgl.graphbolt')
-_gb_stub.__file__ = '<dgl-graphbolt-stub>'
-_gb_stub.__path__ = []
-_gb_stub.__package__ = 'dgl.graphbolt'
-_gb_stub.__spec__ = None
-sys.modules['dgl.graphbolt'] = _gb_stub
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-# PyTorch >= 2.0 uses TF32 matmul by default on Ampere+ GPUs and a different
-# Adam implementation (foreach). Force highest precision and legacy Adam behavior
-# to match the original PyTorch 1.7 training dynamics.
-# set_float32_matmul_precision added in PyTorch 1.11; no-op on 1.7.
-if hasattr(torch, 'set_float32_matmul_precision'):
-    torch.set_float32_matmul_precision('highest')
-
-# foreach param was added in PyTorch 1.10; guard so the same main.py works
-# with PyTorch 1.7 (the paper's environment) and PyTorch 2.x.
-_pt_ver = tuple(int(x) for x in torch.__version__.split('+')[0].split('.')[:2])
-_adam_kw = {'foreach': False} if _pt_ver >= (1, 10) else {}
 
 from data_loader import load_data
 from model import GCN, GCL
@@ -69,10 +29,7 @@ class Experiment:
         np.random.seed(seed)
         random.seed(seed)
         dgl.seed(seed)
-        try:
-            dgl.random.seed(seed)
-        except AttributeError:
-            pass  # dgl.random.seed removed in DGL >= 2.x
+        dgl.random.seed(seed)
 
 
     def loss_cls(self, model, mask, features, labels):
@@ -127,7 +84,7 @@ class Experiment:
 
         model = GCN(in_channels=nfeats, hidden_channels=args.hidden_dim_cls, out_channels=nclasses, num_layers=args.nlayers_cls,
                     dropout=args.dropout_cls, dropout_adj=args.dropedge_cls, Adj=Adj, sparse=args.sparse)
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr_cls, weight_decay=args.w_decay_cls, **_adam_kw)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr_cls, weight_decay=args.w_decay_cls)
 
         bad_counter = 0
         best_val = 0
@@ -220,10 +177,8 @@ class Experiment:
                          emb_dim=args.rep_dim, proj_dim=args.proj_dim,
                          dropout=args.dropout, dropout_adj=args.dropedge_rate, sparse=args.sparse)
 
-            # foreach=False matches PyTorch 1.7 loop-based Adam (paper's environment).
-            # PyTorch 2.x defaults foreach=True which uses different CUDA kernels.
-            optimizer_cl = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.w_decay, **_adam_kw)
-            optimizer_learner = torch.optim.Adam(graph_learner.parameters(), lr=args.lr, weight_decay=args.w_decay, **_adam_kw)
+            optimizer_cl = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.w_decay)
+            optimizer_learner = torch.optim.Adam(graph_learner.parameters(), lr=args.lr, weight_decay=args.w_decay)
 
 
             if torch.cuda.is_available():

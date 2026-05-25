@@ -15,7 +15,13 @@ This code requires the following:
 * Munkres==1.1.4
 * ogb==1.3.1
 
-## USAGE
+## RUN ON KAGGLE
+
+Open [`sublime_kaggle.ipynb`](sublime_kaggle.ipynb) on Kaggle (Settings → Accelerator → **GPU T4 x2** or **GPU P100**) and run the cells top to bottom. The notebook installs the exact paper environment (Python 3.8, PyTorch 1.7.1+cu110, DGL 0.7.1+cu110, numpy 1.20.2, scipy 1.6.3, scikit-learn 0.24.2) via micromamba + official pip wheels, then runs each experiment with the hyperparameters from `scripts/*.sh`.
+
+> ⚠ Do **not** select an L4/A100 accelerator — PyTorch 1.7.1's cu110 wheel was not compiled for those compute capabilities.
+
+## USAGE (local)
 ### Step 1: All the scripts are included in the "scripts" folder. Please get into this folder first.
 ```
 cd scripts
