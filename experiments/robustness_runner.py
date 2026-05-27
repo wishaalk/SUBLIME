@@ -80,8 +80,12 @@ def _build_perturbed_load_data(rate: float, mode: str, seed: int):
     def patched(args):
         out = original(args)
         features, nfeats, labels, nclasses, train_mask, val_mask, test_mask, adj = out
-        # adj is dense float tensor (because sparse=0 for cora) or sparse torch
-        if isinstance(adj, torch.Tensor) and not adj.is_sparse:
+        # adj is dense float tensor (because sparse=0 for cora) or sparse torch,
+        # or a plain numpy ndarray depending on the data_loader path.
+        if isinstance(adj, np.ndarray):
+            new_np = _perturb_adj_dense(adj.astype(np.float32), rate, mode, rng)
+            new_adj = new_np.astype(adj.dtype, copy=False)
+        elif isinstance(adj, torch.Tensor) and not adj.is_sparse:
             adj_np = adj.cpu().numpy().astype(np.float32)
             new_np = _perturb_adj_dense(adj_np, rate, mode, rng)
             new_adj = torch.from_numpy(new_np)
