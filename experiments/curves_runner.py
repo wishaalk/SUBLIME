@@ -106,6 +106,7 @@ def main():
     # Structure Bootstrapping
     p.add_argument("-tau", type=float, default=1)
     p.add_argument("-c", type=int, default=0)
+    p.add_argument("-gpu", type=int, default=0)
 
     args = p.parse_args()
 

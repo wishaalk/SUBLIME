@@ -141,6 +141,7 @@ def main():
     p.add_argument("-patience_cls", type=int, default=10)
     p.add_argument("-tau", type=float, default=0.9999)
     p.add_argument("-c", type=int, default=0)
+    p.add_argument("-gpu", type=int, default=0)
 
     args = p.parse_args()
 
