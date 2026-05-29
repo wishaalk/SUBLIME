@@ -1,5 +1,7 @@
 import argparse
 import copy
+import os
+import time
 from datetime import datetime
 
 import numpy as np
@@ -12,6 +14,10 @@ from graph_learners import *
 from utils import *
 from sklearn.cluster import KMeans
 import dgl
+
+# Throttle per-epoch logging. Override with env LOG_INTERVAL_SEC (seconds).
+# Default: print one heartbeat every 5 minutes per trial.
+_LOG_INTERVAL_SEC = float(os.environ.get("LOG_INTERVAL_SEC", 300))
 
 import random
 
@@ -197,6 +203,7 @@ class Experiment:
                 best_val_test = 0
                 best_epoch = 0
 
+            _last_log_t = time.monotonic()
             for epoch in range(1, args.epochs + 1):
 
                 model.train()
@@ -220,7 +227,10 @@ class Experiment:
                     else:
                         anchor_adj = anchor_adj * args.tau + Adj.detach() * (1 - args.tau)
 
-                print("Epoch {:05d} | CL Loss {:.4f}".format(epoch, loss.item()))
+                _now = time.monotonic()
+                if epoch == 1 or epoch == args.epochs or (_now - _last_log_t) >= _LOG_INTERVAL_SEC:
+                    print("Epoch {:05d} | CL Loss {:.4f}".format(epoch, loss.item()), flush=True)
+                    _last_log_t = _now
 
                 if epoch % args.eval_freq == 0:
                     if args.downstream_task == 'classification':
